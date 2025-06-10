@@ -1,0 +1,21 @@
+{
+  "name": "1brc-thefork",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && docker build -t 1brc-app . && docker run --rm --memory=4g --cpus=4 -v $(pwd)/dist:/app/dist -v $(pwd)/data:/app/data 1brc-app",
+    "dev": "tsx src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
