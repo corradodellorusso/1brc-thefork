@@ -51,7 +51,7 @@ function printCompiledResults(aggregations: Map<any, any>) {
       .join(", ") +
     "}";
 
-  console.log(result);
+  console.log(result, result);
 }
 
 /**
