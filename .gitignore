@@ -164,3 +164,9 @@ profile-*
 profile*
 *clinic*
 *flamegraph* 
+
+# logs
+output
+
+# data
+data/

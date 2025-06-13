@@ -1,18 +1,17 @@
-import { createReadStream } from "node:fs";
-import { createInterface } from "node:readline";
+import { readFileSync } from "node:fs";
 
-const stream = createReadStream(`${process.env.PWD}/data/data.csv`);
-const lineStream = createInterface(stream);
+const fileName = `${process.env.PWD}/data/data.csv`;
 
-const aggregations = new Map();
+const lines = readFileSync(fileName, "utf8").split("\n");
+const aggregations: Record<string, { min: number; max: number; sum: number; count: number }> = {};
 
-for await (const line of lineStream) {
-  const [stationName, temperatureStr] = line.split(",");
+for await (const line of lines.slice(1)) {
+  const [stationName, temperatureStr] = line.split(",") as [string, string];
 
   // use integers for computation to avoid loosing precision
   const temperature = Math.floor(parseFloat(temperatureStr!) * 10);
 
-  const existing = aggregations.get(stationName);
+  const existing = aggregations[stationName];
 
   if (existing) {
     existing.min = Math.min(existing.min, temperature);
@@ -20,12 +19,12 @@ for await (const line of lineStream) {
     existing.sum += temperature;
     existing.count++;
   } else {
-    aggregations.set(stationName, {
+    aggregations[stationName] = {
       min: temperature,
       max: temperature,
       sum: temperature,
       count: 1,
-    });
+    };
   }
 }
 
@@ -36,14 +35,14 @@ printCompiledResults(aggregations);
  *
  * @returns {void}
  */
-function printCompiledResults(aggregations: Map<any, any>) {
-  const sortedStations = Array.from(aggregations.keys()).sort();
+function printCompiledResults(aggregations: Record<string, { min: number; max: number; sum: number; count: number }>) {
+  const sortedStations = Object.keys(aggregations).sort();
 
   let result =
     "{" +
     sortedStations
       .map((station) => {
-        const data = aggregations.get(station);
+        const data = aggregations[station]!;
         return `${station}=${round(data.min / 10)}/${round(
           data.sum / 10 / data.count,
         )}/${round(data.max / 10)}`;
