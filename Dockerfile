@@ -17,4 +17,4 @@ COPY dist/ ./
 # EXPOSE 3000
 
 # Define the command to run the application
-CMD ["time", "node", "index.js"]
+CMD ["time", "-f", "Result real / user time: %e %U",  "node", "index.js"]
