@@ -1,70 +1,122 @@
-import { readFileSync } from "node:fs";
+import fs from "node:fs";
+import {
+  Worker,
+  isMainThread,
+  workerData,
+} from 'node:worker_threads';
 
-const fileName = `${process.env.PWD}/data/data.csv`;
+const fileName = process.env.PWD + "/data/data.csv";
+const fd = fs.openSync(fileName, "r");
 
-const lines = readFileSync(fileName, "utf8").split("\n");
-const aggregations: Record<string, { min: number; max: number; sum: number; count: number }> = {};
+if (isMainThread && process.argv.length == 2) {
+  const nbThreads = 10;
+  const fileSize = fs.statSync(fileName).size;
+  const CUSOR = fileSize / nbThreads;
+  const BUFFER_SIZE = 512;
 
-for await (const line of lines.slice(1)) {
-  const [stationName, temperatureStr] = line.split(",") as [string, string];
+  let previous = 0;
 
-  // use integers for computation to avoid loosing precision
-  const temperature = Math.floor(parseFloat(temperatureStr!) * 10);
+  for (let i = 0; i < nbThreads; i++) {
+    const buffer = Buffer.alloc(BUFFER_SIZE);
 
-  const existing = aggregations[stationName];
+    fs.readSync(fd, buffer, 0, BUFFER_SIZE, Math.min(fileSize, (i+1)*CUSOR));
 
-  if (existing) {
-    existing.min = Math.min(existing.min, temperature);
-    existing.max = Math.max(existing.max, temperature);
-    existing.sum += temperature;
-    existing.count++;
-  } else {
-    aggregations[stationName] = {
-      min: temperature,
-      max: temperature,
-      sum: temperature,
-      count: 1,
-    };
+    const position = buffer.indexOf("\n") + (i+1)*CUSOR;
+
+    console.log("Run split", previous, position);
+
+
+    const worker = new Worker(new URL(import.meta.url), {
+      workerData: {start: previous, end: position},
+    });
+
+    worker.on('message', (message) => {
+      console.log("finish process", message);
+    });
+
+    previous = position;
   }
-}
+} else {
+  let currentWorkerData = workerData;
 
-printCompiledResults(aggregations);
+  if (process.argv.length == 4) {
+    const start = parseInt(process.argv[2]!);
+    const end = parseInt(process.argv[3]!);
 
-/**
- * @param {Map} aggregations
- *
- * @returns {void}
- */
-function printCompiledResults(aggregations: Record<string, { min: number; max: number; sum: number; count: number }>) {
-  const sortedStations = Object.keys(aggregations).sort();
+    currentWorkerData = {
+      start: start,
+      end: end,
+    }
+  }
+  let cities = new Map<string, {min: number, max: number, sum: number, count: number}>();
 
-  let result =
-    "{" +
-    sortedStations
-      .map((station) => {
-        const data = aggregations[station]!;
-        return `${station}=${round(data.min / 10)}/${round(
-          data.sum / 10 / data.count,
-        )}/${round(data.max / 10)}`;
-      })
-      .join(", ") +
-    "}";
+  function process_lines(lines: string) {
+    let position = 0;
+    let new_line_index, next_semicolon, city_name, temperature, city;
 
-  console.log(result);
-}
+    city = {
+      min: Infinity,
+      max: -Infinity,
+      sum: 0,
+      count: 0
+    };
 
-/**
- * @example
- * round(1.2345) // "1.2"
- * round(1.55) // "1.6"
- * round(1) // "1.0"
- *
- * @param {number} num
- *
- * @returns {string}
- */
-function round(num: number) {
-  const fixed = Math.round(10 * num) / 10;
+    while (true) {
+      new_line_index = lines.indexOf('\n', position);
 
-  return fixed.toFixed(1);
-}
+      if (new_line_index == -1) break;
+
+      next_semicolon = lines.indexOf(';', position);
+
+      city_name = lines.substring(position, next_semicolon);
+      temperature = parseFloat(lines.substring(next_semicolon + 1, new_line_index)); //todo: parseFloat can be optimised
+
+      city = cities.get(city_name);
+      if (!city) {
+          city = {
+              min: Infinity,
+              max: -Infinity,
+              sum: 0,
+              count: 0
+          };
+          cities.set(city_name, city);
+      }
+
+
+      if (temperature < city.min) {
+          city.min = temperature;
+      }
+      if (temperature > city.max) {
+          city.max = temperature;
+      }
+      
+      city.sum += temperature;
+      city.count += 1;
+      
+
+      position = new_line_index + 1;
+    }
+  }
+
+  const BIG_BUFFER_SIZE = 32*1024*1024;
+  let buffer = Buffer.alloc(BIG_BUFFER_SIZE);
+
+  let position = 0;
+  let cursor = currentWorkerData.start;
+
+  while (cursor < currentWorkerData.end) {
+    const readSize = Math.min(BIG_BUFFER_SIZE - position, currentWorkerData.end - cursor);
+    const read_size = fs.readSync(fd, buffer, position, readSize, cursor);
+
+    if (read_size == 0) break;
+    
+    const new_line_index = buffer.lastIndexOf('\n', position + read_size)
+
+    process_lines(buffer.toString("utf-8", 0, new_line_index));
+    
+    buffer.copy(buffer, 0, new_line_index + 1, buffer.length);
+
+    position = buffer.length - new_line_index - 1;
+    cursor = cursor + read_size;
+  }
+} 

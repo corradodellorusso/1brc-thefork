@@ -4,8 +4,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "'tsc'",
-    "start": "npm run build && docker build -t 1brc-app . && docker run --rm --memory=1g --cpus=4 -v $(pwd)/dist:/app/dist -v $(pwd)/data:/app/data 1brc-app",
+    "build": "tsc",
+    "start": "npm run build && docker build -t 1brc-app . && docker run --rm --memory=2g -v $(pwd)/dist:/app/dist -v $(pwd)/data:/app/data 1brc-app",
     "dev": "time tsx src/index.ts",
     "download": "[ ! -f data/data.csv.gz ] && curl -L -o data/data.csv.gz 'https://drive.usercontent.google.com/download?id=1A_OCjRyHnCCMZbgT0Z5KN70pJXMA8TYD&export=download&authuser=0&confirm=t&uuid=6a3b0b9e-5988-4fd1-9af6-297c2365ea02&at=11ynXQrkYTZMQE70G7EqfypcaWp3f9eWV'", 
     "small-file": "npm run download ; gzcat data/data.csv.gz | head -n 10000000 > data/data.csv",
