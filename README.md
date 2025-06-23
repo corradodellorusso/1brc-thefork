@@ -33,14 +33,18 @@ The task is to write a program which reads the file, calculates the min, mean, a
 ## Prerequisites
 
 1. Being a forkie 😆
-2. Downloading the full [csv file](https://drive.google.com/file/d/1A_OCjRyHnCCMZbgT0Z5KN70pJXMA8TYD/view) (the one inside `data` folder is only an excerpt).
-3. Having node and docker installed
+2. Having node and docker installed
 
 ## Running the Challenge
 
 This project contains 2 main scripts:
 * `npm run dev`: useful to run the program in the terminal
 * `npm start`: create and starts a docker with the same setting that will be used to evaluate the results
+
+Prior to run anything you need to generate the data file. Because it's an optimisation challenge, the file came in 3 versions
+* `npm run small-file`: "only" 10_000_000 lines. It take allready 4s. Enought to start optimising
+* `npm run big-file`: 100_000_000 lines. Without optimisation it's allready a minutes of run
+* `npm run real-file`: Don't run it it 2 previous steps doesn't run < 10s
 
 ## Rules and limits
 
@@ -55,6 +59,8 @@ This project contains 2 main scripts:
 ## Entering the Challenge
 
 To submit your own implementation simply open a PR changing the `src/index.ts` file with your own implementation.
+Use "challenge_" as prefix to your branch name in order to be run by automation to calculate your result.
+
 
 ## Evaluating Results
 
@@ -69,6 +75,16 @@ The exact same _measurements.txt_ file is used for evaluating all contenders.
 ## Prize
 
 The glory! 
+
+Leaderboard by real time
+| Name | PR | Time | Notes |
+| Laurent | | | |
+| Corrado | | | |
+
+Leaderboard by user time
+| Name | PR | Time | Notes |
+| Laurent | | | |
+| Corrado | | | |
 
 ## FAQ
 
