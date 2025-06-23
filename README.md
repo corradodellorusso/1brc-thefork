@@ -33,13 +33,13 @@ The task is to write a program which reads the file, calculates the min, mean, a
 ## Prerequisites
 
 1. Being a forkie 😆
-2. Having node and docker installed
+2. Having node installed
 
 ## Running the Challenge
 
 This project contains 2 main scripts:
 * `npm run dev`: useful to run the program in the terminal
-* `npm start`: create and starts a docker with the same setting that will be used to evaluate the results
+* `npm start`: builds the JS files and only measures execution time, will be used to evaluate the results
 
 Prior to run anything you need to generate the data file. Because it's an optimisation challenge, the file came in 3 versions
 * `npm run small-file`: "only" 10_000_000 lines. It take allready 4s. Enought to start optimising
@@ -64,7 +64,7 @@ Use "challenge_" as prefix to your branch name in order to be run by automation 
 
 ## Evaluating Results
 
-For now results are determined by running the program in the provided docker container on a Apple MacBook M1 Max.
+For now results are determined by running the program on an Apple MacBook M1 Max with 10 performance cores and 64GB of RAM.
 The `time` program is used for measuring execution times, i.e. end-to-end times are measured.
 Each contender will be run five times in a row.
 The slowest and the fastest runs are discarded.
