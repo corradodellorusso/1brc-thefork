@@ -126,9 +126,6 @@ public
 ehthumbs.db
 Thumbs.db
 
-# Docker
-.dockerignore
-
 # Logs
 logs
 *.log
@@ -163,7 +160,7 @@ profile-*
 # clinic
 profile*
 *clinic*
-*flamegraph* 
+*flamegraph*
 
 # logs
 output
