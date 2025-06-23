@@ -42,9 +42,9 @@ This project contains 2 main scripts:
 * `npm start`: builds the JS files and only measures execution time, will be used to evaluate the results
 
 Prior to run anything you need to generate the data file. Because it's an optimisation challenge, the file came in 3 versions
-* `npm run small-file`: "only" 10_000_000 lines. It take allready 4s. Enought to start optimising
-* `npm run big-file`: 100_000_000 lines. Without optimisation it's allready a minutes of run
-* `npm run real-file`: Don't run it 2 previous steps doesn't run < 10s
+* `npm run small-file`: "only" 10_000_000 lines. It takes already ~4s. Enough to start optimising.
+* `npm run big-file`: 100_000_000 lines. Without optimisation, it's already ~1 minute of execution.
+* `npm run real-file`: 1 billion lines! Don't run this one if previous one does not run in less than 10s!
 
 ## Rules and limits
 
