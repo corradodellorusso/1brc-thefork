@@ -7,20 +7,20 @@ The One Billion Row Challenge (1BRC) is a fun exploration of how far modern lang
 Grab all your knowledge of node and create the fastest implementation for solving this task!
 
 The csv file contains temperature values for a range of weather stations.
-Each row is one measurement in the format `<string: station name>,<double: measurement>`, with the measurement value having exactly one fractional digit.
+Each row is one measurement in the format `<string: station name>;<double: measurement>`, with the measurement value having exactly one fractional digit.
 The following shows ten rows as an example:
 
 ```
-Livingstone,16.3
-N'Djamena,21.7
-Ahvaz,19.9
-Pittsburgh,3.5
-Bloemfontein,19.0
-Makurdi,30.8
-Amsterdam,-14.0
-Tbilisi,25.8
-Yellowknife,-13.6
-Hiroshima,18.1
+Livingstone;16.3
+N'Djamena;21.7
+Ahvaz;19.9
+Pittsburgh;3.5
+Bloemfontein;19.0
+Makurdi;30.8
+Amsterdam;-14.0
+Tbilisi;25.8
+Yellowknife;-13.6
+Hiroshima;18.1
 ```
 
 The task is to write a program which reads the file, calculates the min, mean, and max temperature value per weather station, and emits the results on stdout like this
@@ -44,7 +44,7 @@ This project contains 2 main scripts:
 Prior to run anything you need to generate the data file. Because it's an optimisation challenge, the file came in 3 versions
 * `npm run small-file`: "only" 10_000_000 lines. It take allready 4s. Enought to start optimising
 * `npm run big-file`: 100_000_000 lines. Without optimisation it's allready a minutes of run
-* `npm run real-file`: Don't run it it 2 previous steps doesn't run < 10s
+* `npm run real-file`: Don't run it 2 previous steps doesn't run < 10s
 
 ## Rules and limits
 
