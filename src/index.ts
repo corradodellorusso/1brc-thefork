@@ -10,19 +10,20 @@ const aggregations: Record<
 
 for (const line of lines.slice(1)) {
   if (!line.trim()) continue;
-  const [stationName, temperatureStr] = line.split(",") as [string, string];
+  const parts = line.split(",");
+  if (parts.length !== 2) continue;
+  const [stationName, temperatureStr] = parts as [string, string];
 
   const cleanStationName = stationName.trim();
   const cleanTempStr = temperatureStr.trim();
 
   if (!cleanStationName || !cleanTempStr) continue;
 
-  // use integers for computation to avoid loosing precision
-  const temperature = Math.floor(parseFloat(temperatureStr!) * 10);
+  const temperature = Math.floor(parseFloat(cleanTempStr) * 10);
 
   if (Number.isNaN(temperature)) continue;
 
-  const existing = aggregations[stationName];
+  const existing = aggregations[cleanStationName];
 
   if (existing) {
     existing.min = Math.min(existing.min, temperature);
@@ -30,7 +31,7 @@ for (const line of lines.slice(1)) {
     existing.sum += temperature;
     existing.count++;
   } else {
-    aggregations[stationName] = {
+    aggregations[cleanStationName] = {
       min: temperature,
       max: temperature,
       sum: temperature,
