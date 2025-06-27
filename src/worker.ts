@@ -1,13 +1,11 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
+import { processLine, type Aggregations } from "./line-processor.js";
 
 const { fileName, startByte, endByte } = workerData;
 
-const aggregations: Record<
-  string,
-  { min: number; max: number; sum: number; count: number }
-> = {};
+const aggregations: Aggregations = {};
 
 async function processChunk() {
   const fileStream = createReadStream(fileName, {
@@ -21,34 +19,7 @@ async function processChunk() {
   });
 
   for await (const line of rl) {
-    if (!line.trim()) continue;
-
-    const commaIndex = line.indexOf(",");
-    if (commaIndex === -1) continue;
-
-    const stationName = line.slice(0, commaIndex).trim();
-    const temperatureStr = line.slice(commaIndex + 1).trim();
-
-    if (!stationName || !temperatureStr) continue;
-
-    const temperature = Math.floor(parseFloat(temperatureStr) * 10);
-    if (Number.isNaN(temperature)) continue;
-
-    const existing = aggregations[stationName];
-
-    if (existing) {
-      existing.min = Math.min(existing.min, temperature);
-      existing.max = Math.max(existing.max, temperature);
-      existing.sum += temperature;
-      existing.count++;
-    } else {
-      aggregations[stationName] = {
-        min: temperature,
-        max: temperature,
-        sum: temperature,
-        count: 1,
-      };
-    }
+    processLine(line, aggregations);
   }
 
   // Send results back to main thread

@@ -1,14 +1,12 @@
 import { Worker } from "node:worker_threads";
 import { statSync } from "node:fs";
 import { cpus } from "node:os";
+import { mergeAggregations, type Aggregations } from "./line-processor.js";
 
 const numWorkers = cpus().length; // Use all CPU cores
 const fileName = `${process.env.PWD}/data/data.csv`;
 
-const aggregations: Record<
-  string,
-  { min: number; max: number; sum: number; count: number }
-> = {};
+const aggregations: Aggregations = {};
 
 async function processFile() {
   const fileSize = statSync(fileName).size;
@@ -26,23 +24,8 @@ async function processFile() {
         workerData: { fileName, startByte, endByte },
       });
 
-      worker.on("message", (workerAggregations: Record<string, any>) => {
-        for (const [station, data] of Object.entries(workerAggregations)) {
-          const existing = aggregations[station];
-          if (existing) {
-            existing.min = Math.min(existing.min, data.min);
-            existing.max = Math.max(existing.max, data.max);
-            existing.sum += data.sum;
-            existing.count += data.count;
-          } else {
-            aggregations[station] = {
-              min: data.min,
-              max: data.max,
-              sum: data.sum,
-              count: data.count,
-            };
-          }
-        }
+      worker.on("message", (workerAggregations: Aggregations) => {
+        mergeAggregations(aggregations, workerAggregations);
         resolve(workerAggregations);
       });
 
@@ -68,12 +51,7 @@ processFile().then(() => {
  *
  * @returns {void}
  */
-function printCompiledResults(
-  aggregations: Record<
-    string,
-    { min: number; max: number; sum: number; count: number }
-  >,
-) {
+function printCompiledResults(aggregations: Aggregations) {
   const sortedStations = Object.keys(aggregations).sort();
 
   let result =
