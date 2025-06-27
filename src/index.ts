@@ -3,13 +3,24 @@ import { readFileSync } from "node:fs";
 const fileName = `${process.env.PWD}/data/data.csv`;
 
 const lines = readFileSync(fileName, "utf8").split("\n");
-const aggregations: Record<string, { min: number; max: number; sum: number; count: number }> = {};
+const aggregations: Record<
+  string,
+  { min: number; max: number; sum: number; count: number }
+> = {};
 
-for await (const line of lines.slice(1)) {
+for (const line of lines.slice(1)) {
+  if (!line.trim()) continue;
   const [stationName, temperatureStr] = line.split(",") as [string, string];
+
+  const cleanStationName = stationName.trim();
+  const cleanTempStr = temperatureStr.trim();
+
+  if (!cleanStationName || !cleanTempStr) continue;
 
   // use integers for computation to avoid loosing precision
   const temperature = Math.floor(parseFloat(temperatureStr!) * 10);
+
+  if (Number.isNaN(temperature)) continue;
 
   const existing = aggregations[stationName];
 
@@ -35,7 +46,12 @@ printCompiledResults(aggregations);
  *
  * @returns {void}
  */
-function printCompiledResults(aggregations: Record<string, { min: number; max: number; sum: number; count: number }>) {
+function printCompiledResults(
+  aggregations: Record<
+    string,
+    { min: number; max: number; sum: number; count: number }
+  >,
+) {
   const sortedStations = Object.keys(aggregations).sort();
 
   let result =
