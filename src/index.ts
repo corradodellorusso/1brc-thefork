@@ -8,7 +8,11 @@ type Aggregations = Map<
 
 const FILENAME = `${process.env.PWD}/data/data.csv`;
 
+let totalParseTime = 0;
+let totalAggregationTime = 0;
+
 const processLine = (line: string, aggregations: Aggregations) => {
+  const beginParse = performance.now();
   const splitLine = line.split(",") as string[];
   // Handle lines with a comma in the station name
   const temperatureStr = splitLine.pop() as string;
@@ -16,6 +20,9 @@ const processLine = (line: string, aggregations: Aggregations) => {
 
   // use integers for computation to avoid loosing precision
   const temperature = Math.floor(parseFloat(temperatureStr) * 10);
+  totalParseTime += performance.now() - beginParse;
+
+  const beginAggregation = performance.now();
 
   const existing = aggregations.get(stationName);
 
@@ -32,6 +39,7 @@ const processLine = (line: string, aggregations: Aggregations) => {
       count: 1,
     });
   }
+  totalAggregationTime += performance.now() - beginAggregation;
 };
 
 const computeAggregations = () => {
@@ -56,6 +64,11 @@ const computeAggregations = () => {
     console.time("Aggregations computation time");
     printCompiledResults(aggregations);
     console.timeEnd("Aggregations computation time");
+
+    console.log(`Total parse time: ${totalParseTime.toFixed(2)} ms`);
+    console.log(
+      `Total aggregation time: ${totalAggregationTime.toFixed(2)} ms`,
+    );
   });
 };
 
