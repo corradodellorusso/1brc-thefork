@@ -8,11 +8,16 @@ const aggregations: Record<
   { min: number; max: number; sum: number; count: number }
 > = {};
 
-for await (const line of lines.slice(1)) {
-  const [stationName, temperatureStr] = line.split(";") as [string, string];
+lines.pop(); // remove empty last line
+
+for (const line of lines.slice(1)) {
+  const lineSplitted = line.split(",") as string[];
+  // Handle lines with a comma in the station name
+  const temperatureStr = lineSplitted.pop() as string;
+  const stationName = lineSplitted.join(",");
 
   // use integers for computation to avoid loosing precision
-  const temperature = Math.floor(parseFloat(temperatureStr!) * 10);
+  const temperature = Math.floor(parseFloat(temperatureStr) * 10);
 
   const existing = aggregations[stationName];
 
