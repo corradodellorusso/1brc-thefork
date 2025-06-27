@@ -1,25 +1,28 @@
 import { readFileSync } from "node:fs";
+import { expectedSmallFile } from "./expected.js";
+
+type Aggregations = Map<
+  string,
+  { min: number; max: number; sum: number; count: number }
+>;
 
 const fileName = `${process.env.PWD}/data/data.csv`;
 
 const lines = readFileSync(fileName, "utf8").split("\n");
-const aggregations: Record<
-  string,
-  { min: number; max: number; sum: number; count: number }
-> = {};
+const aggregations: Aggregations = new Map();
 
-lines.pop(); // remove empty last line
-
-for (const line of lines.slice(1)) {
-  const lineSplitted = line.split(",") as string[];
+// Skip first line (header) and last line (empty line)
+for (let lineIndex = 1; lineIndex <= lines.length - 2; lineIndex++) {
+  const line = lines[lineIndex] as string;
+  const splitLine = line.split(",") as string[];
   // Handle lines with a comma in the station name
-  const temperatureStr = lineSplitted.pop() as string;
-  const stationName = lineSplitted.join(",");
+  const temperatureStr = splitLine.pop() as string;
+  const stationName = splitLine.join(",");
 
   // use integers for computation to avoid loosing precision
   const temperature = Math.floor(parseFloat(temperatureStr) * 10);
 
-  const existing = aggregations[stationName];
+  const existing = aggregations.get(stationName);
 
   if (existing) {
     existing.min = Math.min(existing.min, temperature);
@@ -27,35 +30,35 @@ for (const line of lines.slice(1)) {
     existing.sum += temperature;
     existing.count++;
   } else {
-    aggregations[stationName] = {
+    aggregations.set(stationName, {
       min: temperature,
       max: temperature,
       sum: temperature,
       count: 1,
-    };
+    });
   }
 }
 
-printCompiledResults(aggregations);
+const result = printCompiledResults(aggregations);
+
+const isCorrect = result === expectedSmallFile;
+
+console.log("Result is correct:", isCorrect);
 
 /**
  * @param {Map} aggregations
  *
  * @returns {void}
  */
-function printCompiledResults(
-  aggregations: Record<
-    string,
-    { min: number; max: number; sum: number; count: number }
-  >,
-) {
-  const sortedStations = Object.keys(aggregations).sort();
+function printCompiledResults(aggregations: Aggregations) {
+  // TODO: I still have a sorting issue because stationNames like "Washington, D.C." end up first because of the quote
+  const sortedStations = Array.from(aggregations.keys()).sort();
 
   let result =
     "{" +
     sortedStations
       .map((station) => {
-        const data = aggregations[station]!;
+        const data = aggregations.get(station)!;
         return `${station}=${round(data.min / 10)}/${round(
           data.sum / 10 / data.count,
         )}/${round(data.max / 10)}`;
@@ -64,6 +67,7 @@ function printCompiledResults(
     "}";
 
   console.log(result);
+  return result;
 }
 
 /**
@@ -77,7 +81,5 @@ function printCompiledResults(
  * @returns {string}
  */
 function round(num: number) {
-  const fixed = Math.round(10 * num) / 10;
-
-  return fixed.toFixed(1);
+  return num.toFixed(1);
 }
