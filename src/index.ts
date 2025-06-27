@@ -1,46 +1,67 @@
-import { readFileSync } from "node:fs";
+import { Worker } from "node:worker_threads";
+import { statSync } from "node:fs";
+import { cpus } from "node:os";
 
+const numWorkers = cpus().length; // Use all CPU cores
 const fileName = `${process.env.PWD}/data/data.csv`;
 
-const lines = readFileSync(fileName, "utf8").split("\n");
 const aggregations: Record<
   string,
   { min: number; max: number; sum: number; count: number }
 > = {};
 
-for (const line of lines.slice(1)) {
-  if (!line.trim()) continue;
-  const parts = line.split(",");
-  if (parts.length !== 2) continue;
-  const [stationName, temperatureStr] = parts as [string, string];
+async function processFile() {
+  const fileSize = statSync(fileName).size;
+  const chunkSize = Math.floor(fileSize / numWorkers);
 
-  const cleanStationName = stationName.trim();
-  const cleanTempStr = temperatureStr.trim();
+  const promises: Promise<any>[] = [];
 
-  if (!cleanStationName || !cleanTempStr) continue;
+  for (let i = 0; i < numWorkers; i++) {
+    const startByte = i * chunkSize;
+    const endByte =
+      i === numWorkers - 1 ? fileSize - 1 : (i + 1) * chunkSize - 1;
 
-  const temperature = Math.floor(parseFloat(cleanTempStr) * 10);
+    const promise = new Promise((resolve, reject) => {
+      const worker = new Worker("./dist/worker.js", {
+        workerData: { fileName, startByte, endByte },
+      });
 
-  if (Number.isNaN(temperature)) continue;
+      worker.on("message", (workerAggregations: Record<string, any>) => {
+        for (const [station, data] of Object.entries(workerAggregations)) {
+          const existing = aggregations[station];
+          if (existing) {
+            existing.min = Math.min(existing.min, data.min);
+            existing.max = Math.max(existing.max, data.max);
+            existing.sum += data.sum;
+            existing.count += data.count;
+          } else {
+            aggregations[station] = {
+              min: data.min,
+              max: data.max,
+              sum: data.sum,
+              count: data.count,
+            };
+          }
+        }
+        resolve(workerAggregations);
+      });
 
-  const existing = aggregations[cleanStationName];
+      worker.on("error", reject);
+      worker.on("exit", (code) => {
+        if (code !== 0)
+          reject(new Error(`Worker stopped with exit code ${code}`));
+      });
+    });
 
-  if (existing) {
-    existing.min = Math.min(existing.min, temperature);
-    existing.max = Math.max(existing.max, temperature);
-    existing.sum += temperature;
-    existing.count++;
-  } else {
-    aggregations[cleanStationName] = {
-      min: temperature,
-      max: temperature,
-      sum: temperature,
-      count: 1,
-    };
+    promises.push(promise);
   }
+
+  await Promise.all(promises);
 }
 
-printCompiledResults(aggregations);
+processFile().then(() => {
+  printCompiledResults(aggregations);
+});
 
 /**
  * @param {Map} aggregations
