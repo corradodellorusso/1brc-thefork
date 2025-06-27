@@ -5,6 +5,7 @@ import { mergeAggregations, type Aggregations } from "./line-processor.js";
 
 const numWorkers = cpus().length; // Use all CPU cores
 const fileName = `${process.env.PWD}/data/data.csv`;
+// const fileName = `${process.env.PWD}/data/measurements.csv`;
 
 const aggregations: Aggregations = {};
 
