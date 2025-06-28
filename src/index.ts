@@ -39,43 +39,46 @@ function fastParseFloatToInteger(str: string): number {
 
 const computeAggregations = async () => {
   const aggregations: Aggregations = new Map();
-  console.time("File processing time");
-  const fileStream = createReadStream(FILENAME, { encoding: "utf8" });
-  const readline = createInterface({
-    input: fileStream,
-    crlfDelay: Infinity, // Recognize all instances of CR LF ('\r\n') in input as a single line break.
+  const fileStream = createReadStream(FILENAME, {
+    encoding: "utf8",
   });
+  let buffer = "";
 
-  readline.on("line", (line) => {
-    const lastCommaIndex = line.lastIndexOf(",");
-    const stationName = line.slice(0, lastCommaIndex);
-    const temperatureStr = line.slice(lastCommaIndex + 1);
+  fileStream.on("data", (chunk) => {
+    buffer += chunk;
+    let lineEnd;
+    while ((lineEnd = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, lineEnd);
+      buffer = buffer.slice(lineEnd + 1);
 
-    // use integers for computation to avoid loosing precision
-    const temperature = fastParseFloatToInteger(temperatureStr);
+      const lastCommaIndex = line.lastIndexOf(",");
+      const stationName = line.slice(0, lastCommaIndex);
+      const temperatureStr = line.slice(lastCommaIndex + 1);
+      // use integers for computation to avoid loosing precision
+      const temperature = fastParseFloatToInteger(temperatureStr);
+      const existing = aggregations.get(stationName);
 
-    const existing = aggregations.get(stationName);
-
-    if (existing) {
-      existing.min = existing.min < temperature ? existing.min : temperature;
-      existing.max = existing.max > temperature ? existing.max : temperature;
-      existing.sum += temperature;
-      existing.count++;
-    } else {
-      aggregations.set(stationName, {
-        min: temperature,
-        max: temperature,
-        sum: temperature,
-        count: 1,
-      });
+      if (existing) {
+        if (temperature < existing.min) existing.min = temperature;
+        if (temperature > existing.max) existing.max = temperature;
+        existing.sum += temperature;
+        existing.count++;
+      } else {
+        aggregations.set(stationName, {
+          min: temperature,
+          max: temperature,
+          sum: temperature,
+          count: 1,
+        });
+      }
     }
   });
 
-  readline.on("close", () => {
-    console.timeEnd("File processing time");
-    console.time("Aggregations computation time");
+  fileStream.on("end", () => {
+    if (buffer.length > 0) {
+      console.log("buffer: ", buffer);
+    }
     printCompiledResults(aggregations);
-    console.timeEnd("Aggregations computation time");
   });
 };
 
