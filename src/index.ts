@@ -112,7 +112,7 @@ const workerPool = new WorkerPool(NUM_WORKERS);
 const promises: Promise<Aggregations>[] = [];
 const fileStream = createReadStream(FILENAME, {
   encoding: "utf8",
-  highWaterMark: 48 * 1024 * 1024, // Size of each chunk
+  highWaterMark: 32 * 1024 * 1024, // Size of each chunk
 });
 let buffer = "";
 
