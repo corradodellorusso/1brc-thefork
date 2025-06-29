@@ -1,4 +1,4 @@
-import { expectedBigFile } from "./expected.js";
+import { expectedRealFile } from "./expected.js";
 import { createReadStream } from "node:fs";
 import { cpus } from "node:os";
 import { Worker } from "node:worker_threads";
@@ -31,21 +31,23 @@ function printCompiledResults(aggregations: Aggregations) {
 
   console.log(result);
 
-  console.log("isCorrect: ", result === expectedBigFile);
+  console.log("isCorrect: ", result === expectedRealFile);
 }
 
 function round(num: number) {
   return num.toFixed(1);
 }
 
+type Task = {
+  message: string;
+  resolve: (result: Aggregations) => void;
+  reject: (error: any) => void;
+};
+
 class WorkerPool {
   private workers: Worker[];
   private availableWorkers: Worker[];
-  private queue: Array<{
-    message: string;
-    resolve: Function;
-    reject: Function;
-  }>;
+  private queue: Task[];
 
   constructor(poolSize: number) {
     this.workers = [];
@@ -71,11 +73,7 @@ class WorkerPool {
     });
   }
 
-  private executeTask(task: {
-    message: string;
-    resolve: Function;
-    reject: Function;
-  }) {
+  private executeTask(task: Task) {
     const worker = this.availableWorkers.pop()!;
 
     const onMessage = (result: Aggregations) => {
@@ -85,7 +83,8 @@ class WorkerPool {
 
       // Process next task in queue
       if (this.queue.length > 0) {
-        this.executeTask(this.queue.shift()!);
+        // We don't care about task order so pop() is more efficient
+        this.executeTask(this.queue.pop()!);
       }
 
       task.resolve(result);
@@ -113,7 +112,7 @@ const workerPool = new WorkerPool(NUM_WORKERS);
 const promises: Promise<Aggregations>[] = [];
 const fileStream = createReadStream(FILENAME, {
   encoding: "utf8",
-  highWaterMark: 32 * 1024 * 1024, // Size of each chunk
+  highWaterMark: 48 * 1024 * 1024, // Size of each chunk
 });
 let buffer = "";
 
