@@ -77,14 +77,9 @@ The exact same _measurements.txt_ file is used for evaluating all contenders.
 The glory! 
 
 Leaderboard by real time
-| Name | PR | Time | Notes |
-| Laurent | | | |
-| Corrado | | | |
-
-Leaderboard by user time
-| Name | PR | Time | Notes |
-| Laurent | | | |
-| Corrado | | | |
+| Name | PR | Time | Notes |
+| --- | --- | --- | --- |
+| Still in progress! | | | |
 
 ## FAQ
 
@@ -96,7 +91,6 @@ A: The file is encoded with UTF-8.
 
 _Q: Can I make assumptions on the names of the weather stations showing up in the data set?_\
 A: No, while only a fixed set of station names is used by the data set generator, any solution should work with arbitrary UTF-8 station names
-(for the sake of simplicity, names are guaranteed to contain no `,` character).
 
 _Q: Can I copy code from other submissions?_\
 A: Yes, you can. The primary focus of the challenge is about learning something new, rather than "winning". When you do so, please give credit to the relevant source submissions. Please don't re-submit other entries with no or only trivial improvements.
