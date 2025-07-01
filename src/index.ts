@@ -58,7 +58,7 @@ function printCompiledResults(
       .join(", ") +
     "}";
 
-  console.log(result);
+  console.log(result, result);
 }
 
 /**
