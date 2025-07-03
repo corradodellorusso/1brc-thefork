@@ -1,11 +1,17 @@
 import fs from "fs";
 import { Worker } from "worker_threads";
-let total_cities = 0;
 
-//TODO: a worker pool may help to reduce too much worker at the same time, and so too much memory pressure / slowness
-function runWorker(buffer: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const worker = new Worker("./src/worker.ts", { workerData: { buffer } });
+const MAW_WORKERS = 16; // Maximum number of workers to run concurrently
+
+let inProgress = 0;
+async function runWorker(start: any, end: any): Promise<any> {
+  while(inProgress > MAW_WORKERS) {
+      await new Promise(resolve => setTimeout(resolve, 1));
+  }
+  inProgress++;
+
+  let promise =  new Promise((resolve, reject) => {
+    const worker = new Worker("./src/worker.ts", { workerData: { start, end } });
     worker.on("message", resolve);      // Quand le worker envoie un message, on résout la promesse
     worker.on("error", reject);         // En cas d’erreur, on rejette la promesse
     worker.on("exit", (code) => {
@@ -13,47 +19,50 @@ function runWorker(buffer: any): Promise<any> {
         reject(new Error(`Le worker s'est arrêté avec le code ${code}`));
     });
   });
+
+  promise.finally(() => {
+    inProgress--;
+  });
+
+  return promise
 }
 
 async function read_lines() {
-    //Wet finger estimation of good parameter. Sadly this can be mac dependant. Not sur the mac of corra will need the same value
-    const READ_AHEAD = 32*1024*1024;
-    const buffer = Buffer.alloc(READ_AHEAD);
+    const READ_AHEAD = 64*1024*1024; // Read ahead size in bytes, can be adjusted based on memory and performance needs
+    //32 => 0m14.182s
+    //64 => 0m14.112s
+    //128 => 0m14.109s << best, but too much random due to memory pressure
+    const buffer = Buffer.alloc(50);
     const file = fs.openSync("data/data.csv", "r");
 
-    let position = 0
+    let fileCursor = 0;
 
     // Skip of headers
     fs.readSync(file, buffer, 0, 10);
 
-    let start = Date.now();
-
     let tasks = [];
 
     while (true) { // ~ 500 loops
-        const read_size = fs.readSync(file, buffer, position, READ_AHEAD - position, -1);
+        const read_size = fs.readSync(file, buffer, 0, buffer.length, fileCursor + READ_AHEAD);
 
         if (read_size == 0) break;
 
-        const new_line_index = buffer.lastIndexOf('\n', position + read_size)
+        const new_line_index = buffer.lastIndexOf('\n', read_size)
 
-        // Todo: optimize by not sending full buffer view but only position. This will save reading from parent thread and memory copy and move it to worker-thread
-        const shared_array_view = new Uint8Array(new SharedArrayBuffer(new_line_index + 1 - position));
-        buffer.copy(shared_array_view, 0, 0, new_line_index + 1 - position); // Copy are bad
+        tasks.push(runWorker(fileCursor, fileCursor + READ_AHEAD + new_line_index + 1));
 
-        tasks.push(runWorker(shared_array_view));
-
-        position = buffer.length - new_line_index - 1;
-        // move all unused part (after the last \n) for the next loop
-        buffer.copy(buffer, 0, new_line_index + 1, buffer.length);
+        fileCursor += new_line_index + READ_AHEAD + 1;        
     }
 
     fs.closeSync(file);
 
     let cities = new Map();
 
+
+    // we don't want to await all tasks to finish before processing the results
+    // we can process results as they come in
     for (const task of tasks) {
-        const cities_task = await task;
+        const cities_task = await task; 
         
         cities_task.forEach((city, key) => {
             const current_city = cities.get(key) || {
@@ -74,11 +83,9 @@ async function read_lines() {
             
 
             cities.set(key, current_city);
-            total_cities += city.count;
         });
     }
 
-    console.log(" -- ", (Date.now() - start) / 1000, "s")
     return cities;
 }
 
