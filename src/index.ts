@@ -1,56 +1,24 @@
-import { readFileSync } from "node:fs";
+import { expectedRealFile } from "./expected.js";
+import { createReadStream } from "node:fs";
+import { cpus } from "node:os";
+import { Worker } from "node:worker_threads";
+import { Aggregations } from "./workers.js";
 
-const fileName = `${process.env.PWD}/data/data.csv`;
+const FILENAME = `${process.env.PWD}/data/data.csv`;
+const NUM_WORKERS = cpus().length;
 
-const lines = readFileSync(fileName, "utf8").split("\n");
-const aggregations: Record<
-  string,
-  { min: number; max: number; sum: number; count: number }
-> = {};
-
-for await (const line of lines.slice(1)) {
-  const [stationName, temperatureStr] = line.split(";") as [string, string];
-
-  // use integers for computation to avoid loosing precision
-  const temperature = Math.floor(parseFloat(temperatureStr!) * 10);
-
-  const existing = aggregations[stationName];
-
-  if (existing) {
-    existing.min = Math.min(existing.min, temperature);
-    existing.max = Math.max(existing.max, temperature);
-    existing.sum += temperature;
-    existing.count++;
-  } else {
-    aggregations[stationName] = {
-      min: temperature,
-      max: temperature,
-      sum: temperature,
-      count: 1,
-    };
-  }
-}
-
-printCompiledResults(aggregations);
-
-/**
- * @param {Map} aggregations
- *
- * @returns {void}
- */
-function printCompiledResults(
-  aggregations: Record<
-    string,
-    { min: number; max: number; sum: number; count: number }
-  >,
-) {
-  const sortedStations = Object.keys(aggregations).sort();
+function printCompiledResults(aggregations: Aggregations) {
+  const sortedStations = Array.from(aggregations.keys())
+    // I've kept the first line of headers and remove it only here to avoid having if statement in the loop
+    // TODO: this does not seem to save much time
+    .filter((key) => key !== "city")
+    .sort();
 
   let result =
     "{" +
     sortedStations
       .map((station) => {
-        const data = aggregations[station]!;
+        const data = aggregations.get(station)!;
         return `${station}=${round(data.min / 10)}/${round(
           data.sum / 10 / data.count,
         )}/${round(data.max / 10)}`;
@@ -59,20 +27,122 @@ function printCompiledResults(
     "}";
 
   console.log(result);
+
+  console.log("isCorrect: ", result === expectedRealFile);
 }
 
-/**
- * @example
- * round(1.2345) // "1.2"
- * round(1.55) // "1.6"
- * round(1) // "1.0"
- *
- * @param {number} num
- *
- * @returns {string}
- */
 function round(num: number) {
-  const fixed = Math.round(10 * num) / 10;
-
-  return fixed.toFixed(1);
+  return num.toFixed(1);
 }
+
+type Task = {
+  message: string;
+  resolve: (result: Aggregations) => void;
+  reject: (error: any) => void;
+};
+
+class WorkerPool {
+  private workers: Worker[];
+  private availableWorkers: Worker[];
+  private queue: Task[];
+
+  constructor(poolSize: number) {
+    this.workers = [];
+    this.availableWorkers = [];
+    this.queue = [];
+
+    for (let i = 0; i < poolSize; i++) {
+      const worker = new Worker(`${process.env.PWD}/dist/workers.js`);
+      this.workers.push(worker);
+      this.availableWorkers.push(worker);
+    }
+  }
+
+  async processMessage(message: string): Promise<Aggregations> {
+    return new Promise((resolve, reject) => {
+      const task = { message, resolve, reject };
+
+      if (this.availableWorkers.length > 0) {
+        this.executeTask(task);
+      } else {
+        this.queue.push(task);
+      }
+    });
+  }
+
+  private executeTask(task: Task) {
+    const worker = this.availableWorkers.pop()!;
+
+    const onMessage = (result: Aggregations) => {
+      worker.off("message", onMessage);
+      worker.off("error", onError);
+      this.availableWorkers.push(worker);
+
+      if (this.queue.length > 0) {
+        // We don't care about task order so pop() is more efficient
+        this.executeTask(this.queue.pop()!);
+      }
+
+      task.resolve(result);
+    };
+
+    const onError = (error: any) => {
+      worker.off("message", onMessage);
+      worker.off("error", onError);
+      this.availableWorkers.push(worker);
+      task.reject(error);
+    };
+
+    worker.on("message", onMessage);
+    worker.on("error", onError);
+    worker.postMessage(task.message);
+  }
+
+  async terminate() {
+    await Promise.all(this.workers.map((worker) => worker.terminate()));
+  }
+}
+
+const workerPool = new WorkerPool(NUM_WORKERS);
+
+const promises: Promise<Aggregations>[] = [];
+const fileStream = createReadStream(FILENAME, {
+  encoding: "utf8",
+  highWaterMark: 32 * 1024 * 1024, // Size of each chunk
+});
+let buffer = "";
+
+fileStream.on("data", (chunk) => {
+  buffer += chunk;
+  const lastLineEnd = buffer.lastIndexOf("\n");
+  promises.push(workerPool.processMessage(buffer.slice(0, lastLineEnd)));
+  buffer = buffer.slice(lastLineEnd + 1);
+});
+
+fileStream.on("end", async () => {
+  if (buffer.length > 0) {
+    console.log("Remaining buffer: ", buffer);
+  }
+  const results = await Promise.all(promises);
+
+  console.log("Number of chunks: ", results.length);
+
+  const mergedAggregations: Aggregations = new Map();
+  for (let i = 0; i < results.length; i++) {
+    for (const [station, data] of results[i]!) {
+      const existing = mergedAggregations.get(station);
+      if (existing) {
+        if (data.min < existing.min) existing.min = data.min;
+        if (data.max > existing.max) existing.max = data.max;
+        existing.sum += data.sum;
+        existing.count += data.count;
+      } else {
+        mergedAggregations.set(station, { ...data });
+      }
+    }
+  }
+
+  printCompiledResults(mergedAggregations);
+
+  await workerPool.terminate();
+});
