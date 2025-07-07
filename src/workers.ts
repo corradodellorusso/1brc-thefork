@@ -19,13 +19,11 @@ function fastParseFloatToInteger(
     i++;
   }
 
-  // Parse integer part
   while (i < end && str[i] !== ".") {
     result = result * 10 + (str.charCodeAt(i) - 48);
     i++;
   }
 
-  // Parse decimal part (always one digit)
   if (i < end && str[i] === ".") {
     i++;
     if (i < end) {
@@ -36,35 +34,10 @@ function fastParseFloatToInteger(
   return result * sign;
 }
 
-// function processLine(line: string, aggregations: Aggregations): void {
-//   const lastCommaIndex = line.lastIndexOf(",");
-//   const stationName = line.slice(0, lastCommaIndex);
-//   const temperatureStr = line.slice(lastCommaIndex + 1);
-
-//   // use integers for computation to avoid losing precision (this returns parsed float * 10)
-//   const temperature = fastParseFloatToInteger(temperatureStr);
-//   const existing = aggregations.get(stationName);
-
-//   if (existing) {
-//     if (temperature < existing.min) existing.min = temperature;
-//     if (temperature > existing.max) existing.max = temperature;
-//     existing.sum += temperature;
-//     existing.count++;
-//   } else {
-//     aggregations.set(stationName, {
-//       min: temperature,
-//       max: temperature,
-//       sum: temperature,
-//       count: 1,
-//     });
-//   }
-// }
-
 function processChunk(chunk: string, aggregations: Aggregations): void {
   let start = 0;
   const len = chunk.length;
   while (start < len) {
-    // Find end of line
     let lineEnd = start;
     while (lineEnd < len && chunk[lineEnd] !== "\n") {
       lineEnd++;
@@ -75,9 +48,8 @@ function processChunk(chunk: string, aggregations: Aggregations): void {
       continue;
     }
 
-    // Find last comma in the line
     let commaIndex = lineEnd - 1;
-    while (commaIndex > start && chunk[commaIndex] !== ",") {
+    while (commaIndex > start && chunk[commaIndex] !== ";") {
       commaIndex--;
     }
 
@@ -86,10 +58,8 @@ function processChunk(chunk: string, aggregations: Aggregations): void {
       continue;
     }
 
-    // Extract station name without creating substring
     const stationName = chunk.slice(start, commaIndex);
 
-    // Parse temperature directly without creating substring
     const temperature = fastParseFloatToInteger(chunk, commaIndex + 1, lineEnd);
 
     const existing = aggregations.get(stationName);

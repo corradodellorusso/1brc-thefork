@@ -4,13 +4,10 @@ import { cpus } from "node:os";
 import { Worker } from "node:worker_threads";
 import { Aggregations } from "./workers.js";
 
-// https://github.com/corradodellorusso/1brc-thefork
-
 const FILENAME = `${process.env.PWD}/data/data.csv`;
 const NUM_WORKERS = cpus().length;
 
 function printCompiledResults(aggregations: Aggregations) {
-  // TODO: Is it a sorting issue if names like "Washington, D.C." end up first because of the quote?
   const sortedStations = Array.from(aggregations.keys())
     // I've kept the first line of headers and remove it only here to avoid having if statement in the loop
     // TODO: this does not seem to save much time
@@ -81,7 +78,6 @@ class WorkerPool {
       worker.off("error", onError);
       this.availableWorkers.push(worker);
 
-      // Process next task in queue
       if (this.queue.length > 0) {
         // We don't care about task order so pop() is more efficient
         this.executeTask(this.queue.pop()!);
