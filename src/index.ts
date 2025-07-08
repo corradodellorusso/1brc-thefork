@@ -1,49 +1,58 @@
-import { readFileSync } from "node:fs";
+import { Worker } from "node:worker_threads";
+import { statSync } from "node:fs";
+import { cpus } from "node:os";
+import { mergeAggregations, type Aggregations } from "./line-processor.js";
 
+const numWorkers = cpus().length; // Use all CPU cores
 const fileName = `${process.env.PWD}/data/data.csv`;
+// const fileName = `${process.env.PWD}/data/measurements.csv`;
 
-const lines = readFileSync(fileName, "utf8").split("\n");
-const aggregations: Record<
-  string,
-  { min: number; max: number; sum: number; count: number }
-> = {};
+const aggregations: Aggregations = {};
 
-for await (const line of lines.slice(1)) {
-  const [stationName, temperatureStr] = line.split(";") as [string, string];
+async function processFile() {
+  const fileSize = statSync(fileName).size;
+  const chunkSize = Math.floor(fileSize / numWorkers);
 
-  // use integers for computation to avoid loosing precision
-  const temperature = Math.floor(parseFloat(temperatureStr!) * 10);
+  const promises: Promise<any>[] = [];
 
-  const existing = aggregations[stationName];
+  for (let i = 0; i < numWorkers; i++) {
+    const startByte = i * chunkSize;
+    const endByte =
+      i === numWorkers - 1 ? fileSize - 1 : (i + 1) * chunkSize - 1;
 
-  if (existing) {
-    existing.min = Math.min(existing.min, temperature);
-    existing.max = Math.max(existing.max, temperature);
-    existing.sum += temperature;
-    existing.count++;
-  } else {
-    aggregations[stationName] = {
-      min: temperature,
-      max: temperature,
-      sum: temperature,
-      count: 1,
-    };
+    const promise = new Promise((resolve, reject) => {
+      const worker = new Worker("./dist/worker.js", {
+        workerData: { fileName, startByte, endByte },
+      });
+
+      worker.on("message", (workerAggregations: Aggregations) => {
+        mergeAggregations(aggregations, workerAggregations);
+        resolve(workerAggregations);
+      });
+
+      worker.on("error", reject);
+      worker.on("exit", (code) => {
+        if (code !== 0)
+          reject(new Error(`Worker stopped with exit code ${code}`));
+      });
+    });
+
+    promises.push(promise);
   }
+
+  await Promise.all(promises);
 }
 
-printCompiledResults(aggregations);
+processFile().then(() => {
+  printCompiledResults(aggregations);
+});
 
 /**
  * @param {Map} aggregations
  *
  * @returns {void}
  */
-function printCompiledResults(
-  aggregations: Record<
-    string,
-    { min: number; max: number; sum: number; count: number }
-  >,
-) {
+function printCompiledResults(aggregations: Aggregations) {
   const sortedStations = Object.keys(aggregations).sort();
 
   let result =
