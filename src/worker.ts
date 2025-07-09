@@ -11,31 +11,56 @@ const file = fs.openSync("data/data.csv", "r");
 const buffer = Buffer.alloc(end - start);
 fs.readSync(file, buffer, 0, end - start, start);
 
-const lines = buffer.toString('utf8');
+const decoder = new TextDecoder("utf-8");
+const lines = decoder.decode(buffer);
+
 fs.closeSync(file);
 
 let new_line_index, next_semicolon, city_name, temperature, city;
 
-city = {
-    min: Infinity,
-    max: -Infinity,
-    sum: 0,
-    count: 0
-};
+function fastParseFloatToInteger(
+  str: string,
+  start: number,
+  end: number = -1,
+): number {
+  let result = 0;
+  let sign = 1;
+  let i = start;
+
+  if (end === -1) {
+    end = str.length;
+  }
+
+  if (str[i] === "-") {
+    sign = -1;
+    i++;
+  }
+
+  while (i < end && str[i] !== ".") {
+    result = result * 10 + (str.charCodeAt(i) - 48);
+    i++;
+  }
+
+  if (i < end && str[i] === ".") {
+    i++;
+    if (i < end) {
+      result = result * 10 + (str.charCodeAt(i) - 48);
+    }
+  }
+
+  return result * sign;
+}
 
 
-while (true) {
-    new_line_index = lines.indexOf('\n', position);
-
-    if (new_line_index == -1) break;
-
+while ((new_line_index = lines.indexOf('\n', position)) !== -1) {
     next_semicolon = lines.indexOf(';', position);
-
     // Extract the city name
-    city_name = lines.substring(position, next_semicolon);
+    city_name = lines.slice(position, next_semicolon);
     
+    position = new_line_index + 1;
+
     // Extract the temperature
-    temperature = parseFloat(lines.substring(next_semicolon + 1, new_line_index)); //todo: parseFloat can be optimised
+    temperature = fastParseFloatToInteger(lines, next_semicolon + 1, new_line_index); //todo: parseFloat can be optimised
 
     city = cities.get(city_name);
     if (!city) {
@@ -60,7 +85,7 @@ while (true) {
     city.count += 1;
     
 
-    position = new_line_index + 1;
+
 }
 
 parentPort.postMessage(cities);
