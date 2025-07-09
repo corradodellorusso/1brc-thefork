@@ -88,4 +88,5 @@ while ((new_line_index = lines.indexOf('\n', position)) !== -1) {
 
 }
 
-parentPort.postMessage(cities);
+if (parentPort)
+  parentPort.postMessage(cities);

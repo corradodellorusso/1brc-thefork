@@ -3,6 +3,14 @@ import { Worker } from "worker_threads";
 
 const MAW_WORKERS = 16; // Maximum number of workers to run concurrently
 
+// define type of data
+interface CityData {
+  min: number;
+  max: number;
+  sum: number;
+  count: number;
+}
+
 let inProgress = 0;
 async function runWorker(start: any, end: any): Promise<any> {
   while(inProgress > MAW_WORKERS) {
@@ -11,7 +19,7 @@ async function runWorker(start: any, end: any): Promise<any> {
   inProgress++;
 
   let promise =  new Promise((resolve, reject) => {
-    const worker = new Worker("./src/worker.ts", { workerData: { start, end } });
+    const worker = new Worker("./dist/worker.js", { workerData: { start, end } });
     worker.on("message", resolve);      // Quand le worker envoie un message, on résout la promesse
     worker.on("error", reject);         // En cas d’erreur, on rejette la promesse
     worker.on("exit", (code) => {
@@ -27,7 +35,7 @@ async function runWorker(start: any, end: any): Promise<any> {
   return promise
 }
 
-async function read_lines() {
+async function read_lines(): Promise<Map<string, CityData>> {
     const READ_AHEAD = 64*1024*1024; // Read ahead size in bytes, can be adjusted based on memory and performance needs
     //32 => 0m14.182s
     //64 => 0m14.112s
@@ -38,7 +46,7 @@ async function read_lines() {
     let fileCursor = 0;
 
     // Skip of headers
-    fs.readSync(file, buffer, 0, 10);
+    fs.readSync(file, buffer, 0, 10, null);
 
     let tasks = [];
 
@@ -56,7 +64,7 @@ async function read_lines() {
 
     fs.closeSync(file);
 
-    let cities = new Map();
+    let cities: Map<string, CityData> = new Map();
 
 
     // we don't want to await all tasks to finish before processing the results
@@ -64,7 +72,7 @@ async function read_lines() {
     for (const task of tasks) {
         const cities_task = await task; 
         
-        cities_task.forEach((city, key) => {
+        cities_task.forEach((city: any, key: string) => {
             const current_city = cities.get(key) || {
                 min: Infinity,
                 max: -Infinity,
@@ -99,9 +107,9 @@ printCompiledResults(cities);
  * @returns {void}
  */
 function printCompiledResults(
-  aggregations: Record<
+  aggregations: Map<
     string,
-    { min: number; max: number; sum: number; count: number }
+    CityData
   >,
 ) {
   const sortedStations = [...aggregations.keys()].sort();
